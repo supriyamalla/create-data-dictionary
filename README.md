@@ -43,8 +43,7 @@ workbook."* The skill is picked up automatically.
 > Note: Skills don't sync across surfaces. If you use both Claude.ai and Claude Code, install it to each separately.
 
 ## Requirements
-Python with `openpyxl` (listed in `requirements.txt`). The dependency map / diff / recolor companion
-Skills are separate; this one only needs `openpyxl`.
+Python with `openpyxl` (listed in `requirements.txt`) — that's the only dependency.
 
 ## How it works (the short version)
 The scripts do the deterministic work — unzip, parse, resolve calc IDs, trace dependencies, compute
