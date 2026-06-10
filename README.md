@@ -49,4 +49,4 @@ create-data-dictionary/
 ```
 
 ## License
-MIT (or your choice) — feel free to use, modify, and share.
+MIT — see [LICENSE](LICENSE). Feel free to use, modify, and share.
