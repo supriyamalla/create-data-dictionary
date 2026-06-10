@@ -14,18 +14,33 @@ A two-sheet `.xlsx`:
   plain-English description, the resolved formula, what it depends on, what it feeds, the sheets it's
   used in, and a status flag.
 
-## Install & use
+## Install
 
-### On Claude.ai (easiest)
+### One command (recommended)
+Run this in any coding agent with a terminal (Claude Code, Cursor, etc.):
+
+```bash
+npx skills@latest add supriyamalla/create-data-dictionary
+```
+
+This launches an interactive picker — select the skill and which agent(s) to install it to, and it copies
+everything into the right place for you. No download, no manual steps. (Powered by the open-source
+[`skills` CLI](https://github.com/vercel-labs/skills).)
+
+### Manual copy (Claude Code)
+Prefer not to use the CLI? Copy the `skills/create-data-dictionary/` folder into `~/.claude/skills/`
+(personal) or your project's `.claude/skills/` directory. Claude Code discovers it automatically.
+
+### On Claude.ai (web)
+Claude.ai can't install from GitHub — it only accepts zip uploads:
 1. Download **`create-data-dictionary.zip`** from this repo.
-2. In Claude.ai, open **Settings → Capabilities (Features) → Skills** and upload the zip as a custom Skill.
-3. Start a chat, attach your `.twbx`, and ask something like *"Build a data dictionary for this Tableau workbook."* Claude picks up the Skill automatically.
+2. Open **Settings → Capabilities (Features) → Skills** and upload the zip as a custom Skill.
 
-### In Claude Code
-Copy the `create-data-dictionary/` folder into `~/.claude/skills/` (personal) or your project's
-`.claude/skills/` directory. Claude Code discovers it automatically — just ask it to document a workbook.
+## Use
+Start a chat, attach your `.twbx`, and ask something like *"Build a data dictionary for this Tableau
+workbook."* The skill is picked up automatically.
 
-> Note: Skills don't sync across surfaces. If you use both Claude.ai and the Claude API, upload it to each separately.
+> Note: Skills don't sync across surfaces. If you use both Claude.ai and Claude Code, install it to each separately.
 
 ## Requirements
 Python with `openpyxl` (listed in `requirements.txt`). The dependency map / diff / recolor companion
@@ -34,18 +49,19 @@ Skills are separate; this one only needs `openpyxl`.
 ## How it works (the short version)
 The scripts do the deterministic work — unzip, parse, resolve calc IDs, trace dependencies, compute
 usage. The *plain-English descriptions* of what each calculation means to the business are authored
-during the run (that's the part domain knowledge adds). See `create-data-dictionary/SKILL.md` for the
+during the run (that's the part domain knowledge adds). See `skills/create-data-dictionary/SKILL.md` for the
 full workflow.
 
 ## Files
 ```
-create-data-dictionary/
+skills/create-data-dictionary/
   SKILL.md              # the Skill definition Claude reads
   requirements.txt      # openpyxl
   scripts/
     tableau_xml.py      # shared parser: .twbx -> structured field catalog
     parse_workbook.py   # dump fields + resolved formulas (for authoring descriptions)
     build_dictionary.py # build the Excel data dictionary
+create-data-dictionary.zip  # zip for Claude.ai upload
 ```
 
 ## License
