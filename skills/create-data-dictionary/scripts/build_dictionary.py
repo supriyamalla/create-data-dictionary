@@ -14,7 +14,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from tableau_xml import parse_workbook
-from lint_workbook import lint, add_findings_sheet, CHECKS
+from lint_workbook import lint, add_findings_sheet, CHECKS, legend_block
 
 def status(f):
     if f["kind"] == "parameter": return "Parameter"
@@ -27,25 +27,27 @@ def _actions_sheet(book, actions):
     thin=Side(style="thin",color="D9D9D9"); border=Border(left=thin,right=thin,top=thin,bottom=thin)
     sh=book.create_sheet("Actions")
     cols=["Action","Type","Trigger","Source (dashboard · sheet)","Target"]
+    TYPE_FILL={"Filter":"DDEBF7","Highlight":"FFF2CC","Go to URL":"E2EFDA","Change parameter":"FCE4D6"}
     for i,w in enumerate([30,16,12,40,34],1):
         sh.column_dimensions[get_column_letter(i)].width=w
-        c=sh.cell(row=1,column=i,value=cols[i-1]); c.font=arial(bold=True,color="FFFFFF",size=10)
+    hdr=legend_block(sh, [(TYPE_FILL[t],t) for t in ["Filter","Highlight","Go to URL","Change parameter"]])
+    for i in range(1,6):
+        c=sh.cell(row=hdr,column=i,value=cols[i-1]); c.font=arial(bold=True,color="FFFFFF",size=10)
         c.fill=PatternFill("solid",fgColor=HEAD); c.alignment=Alignment(vertical="center",wrap_text=True)
-    sh.row_dimensions[1].height=22
-    TYPE_FILL={"Filter":"DDEBF7","Highlight":"FFF2CC","Go to URL":"E2EFDA","Change parameter":"FCE4D6"}
-    rn=2
+    sh.row_dimensions[hdr].height=22
+    rn=hdr+1
     for a in actions:
         src=" · ".join(x for x in [a["source_dashboard"],a["source_sheet"]] if x)
-        sh.append([a["caption"],a["type"],a["trigger"],src,a["target"]])
+        vals=[a["caption"],a["type"],a["trigger"],src,a["target"]]
         fill=TYPE_FILL.get(a["type"],"FFFFFF")
         for ci in range(1,6):
-            c=sh.cell(row=rn,column=ci); c.font=arial(size=9.5)
+            c=sh.cell(row=rn,column=ci,value=vals[ci-1]); c.font=arial(size=9.5)
             c.alignment=Alignment(vertical="top",wrap_text=True); c.border=border
             if fill!="FFFFFF": c.fill=PatternFill("solid",fgColor=fill)
         rn+=1
-    if rn==2:
-        sh.append(["— no dashboard actions —","","","",""])
-    sh.freeze_panes="A2"; sh.auto_filter.ref=f"A1:E{max(rn-1,1)}"
+    if rn==hdr+1:
+        sh.cell(row=rn,column=1,value="— no dashboard actions —"); rn+=1
+    sh.freeze_panes=f"A{hdr+1}"; sh.auto_filter.ref=f"A{hdr}:E{max(rn-1,hdr)}"
 
 def main():
     ap = argparse.ArgumentParser()
@@ -106,30 +108,31 @@ def main():
     cols=["Field","Datasource","Kind","Role","Data Type","Description","Formula",
           "Depends On","Feeds Into","Used In Sheets","Status"]
     widths=[26,20,12,11,11,46,52,26,26,34,16]
-    d.append(cols)
     for i,w in enumerate(widths,1):
         d.column_dimensions[get_column_letter(i)].width=w
-        c=d.cell(row=1,column=i); c.font=arial(bold=True,color="FFFFFF",size=10)
+    hdr=legend_block(d, [("DDEBF7","Calculated field"),("E2EFDA","Parameter"),
+                         ("FFFFFF","Physical column"),(WARN,"Unused calc (also flagged in Status)")])
+    for i in range(1,len(cols)+1):
+        c=d.cell(row=hdr,column=i,value=cols[i-1]); c.font=arial(bold=True,color="FFFFFF",size=10)
         c.fill=PatternFill("solid",fgColor=HEAD); c.alignment=Alignment(vertical="center",wrap_text=True)
-    d.row_dimensions[1].height=28
+    d.row_dimensions[hdr].height=28
     thin=Side(style="thin",color="D9D9D9"); border=Border(left=thin,right=thin,top=thin,bottom=thin)
-    rn=2
+    rn=hdr+1
     for f in fields:
         st=status(f)
         dsc=desc.get(f["caption"], "" if f["kind"]!="field" else f"Physical column from {f['datasource']}.")
         vals=[f["caption"],f["datasource"],f["kind"].title(),(f["role"] or "").title(),
               (f["datatype"] or "").title(),dsc,f["formula"],", ".join(f["dependencies"]),
               ", ".join(f["feeds_into"]),", ".join(f["used_in"]),st]
-        d.append(vals)
         fill=WARN if st=="Unused calc" else KIND_FILL[f["kind"]]
         for ci in range(1,len(cols)+1):
-            c=d.cell(row=rn,column=ci)
+            c=d.cell(row=rn,column=ci,value=vals[ci-1])
             c.font=Font(name=("Consolas" if ci==7 else "Arial"),size=(9 if ci==7 else 9.5),
                         color=("C0504D" if (ci==11 and st=="Unused calc") else "000000"))
             c.alignment=Alignment(vertical="top",wrap_text=True); c.border=border
             if fill!="FFFFFF": c.fill=PatternFill("solid",fgColor=fill)
         rn+=1
-    d.freeze_panes="A2"; d.auto_filter.ref=f"A1:{get_column_letter(len(cols))}{rn-1}"
+    d.freeze_panes=f"A{hdr+1}"; d.auto_filter.ref=f"A{hdr}:{get_column_letter(len(cols))}{rn-1}"
 
     # Dashboard actions
     _actions_sheet(book, wb["actions"])
