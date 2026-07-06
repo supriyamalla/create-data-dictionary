@@ -79,12 +79,14 @@ descriptions — which also feed the dictionary's Description column). The lint 
 workbook.
 
 ## Output
-A four-sheet `.xlsx` (three with `--no-graph`):
-- **Summary** — datasource/sheet/field counts, a list of unused calcs, and a *Health check (lint)*
-  section with the per-check counts.
+A five-sheet `.xlsx` (four with `--no-graph`):
+- **Summary** — datasource/sheet/field counts, dashboard-action count, a list of unused calcs, and a
+  *Health check (lint)* section with the per-check counts.
 - **Data Dictionary** — one filterable row per field: name, datasource, kind, role, datatype, your
   description, the resolved formula, dependencies, what it feeds, sheets it's used in, status flag.
   Rows are colour-banded by kind; unused calcs are flagged.
+- **Actions** — the dashboard actions: `Action · Type · Trigger · Source · Target`, colour-banded by
+  type (filter / highlight / URL / parameter). Shows "— no dashboard actions —" if the workbook has none.
 - **Lint** — the health-check findings, embedded automatically: one filterable row per issue
   (`Check · Field · Datasource · Detail · Formula · Suggested fix`), colour-banded per check.
 - **Dependency Graph** — the left→right picture (see below; skipped with `--no-graph`).

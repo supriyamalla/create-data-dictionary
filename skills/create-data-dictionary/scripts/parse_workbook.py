@@ -8,10 +8,15 @@ Usage:
 Prints a readable summary (counts + every calculated field with its resolved
 formula + the unused-calc list) and saves the full catalog as JSON.
 """
-import argparse, json, os
+import argparse, json, os, sys
 from tableau_xml import parse_workbook
 
 def main():
+    # Windows consoles default to cp1252 and crash printing emoji in field names/formulas.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     ap=argparse.ArgumentParser()
     ap.add_argument("workbook"); ap.add_argument("-o","--output")
     a=ap.parse_args()

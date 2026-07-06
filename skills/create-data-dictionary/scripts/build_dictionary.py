@@ -21,6 +21,32 @@ def status(f):
     if f["kind"] == "calculated": return "Unused calc" if f["unused"] else "Active"
     return "Active" if f["used_in"] else "Not placed on a sheet"
 
+def _actions_sheet(book, actions):
+    """Add a sheet listing the workbook's dashboard actions (filter / highlight / URL / etc.)."""
+    HEAD="2F5496"; arial=lambda **k: Font(name="Arial", **k)
+    thin=Side(style="thin",color="D9D9D9"); border=Border(left=thin,right=thin,top=thin,bottom=thin)
+    sh=book.create_sheet("Actions")
+    cols=["Action","Type","Trigger","Source (dashboard · sheet)","Target"]
+    for i,w in enumerate([30,16,12,40,34],1):
+        sh.column_dimensions[get_column_letter(i)].width=w
+        c=sh.cell(row=1,column=i,value=cols[i-1]); c.font=arial(bold=True,color="FFFFFF",size=10)
+        c.fill=PatternFill("solid",fgColor=HEAD); c.alignment=Alignment(vertical="center",wrap_text=True)
+    sh.row_dimensions[1].height=22
+    TYPE_FILL={"Filter":"DDEBF7","Highlight":"FFF2CC","Go to URL":"E2EFDA","Change parameter":"FCE4D6"}
+    rn=2
+    for a in actions:
+        src=" · ".join(x for x in [a["source_dashboard"],a["source_sheet"]] if x)
+        sh.append([a["caption"],a["type"],a["trigger"],src,a["target"]])
+        fill=TYPE_FILL.get(a["type"],"FFFFFF")
+        for ci in range(1,6):
+            c=sh.cell(row=rn,column=ci); c.font=arial(size=9.5)
+            c.alignment=Alignment(vertical="top",wrap_text=True); c.border=border
+            if fill!="FFFFFF": c.fill=PatternFill("solid",fgColor=fill)
+        rn+=1
+    if rn==2:
+        sh.append(["— no dashboard actions —","","","",""])
+    sh.freeze_panes="A2"; sh.auto_filter.ref=f"A1:E{max(rn-1,1)}"
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("workbook")
@@ -49,6 +75,7 @@ def main():
     nk=lambda k: sum(f["kind"]==k for f in fields)
     rows=[("",""),("Datasources",str(len(wb["datasources"]))," · ".join(wb["datasources"])),
           ("Worksheets",str(len(wb["worksheets"])),""),("Dashboards",str(len(wb["dashboards"]))," · ".join(wb["dashboards"])),
+          ("Dashboard actions",str(len(wb["actions"]))," · ".join(sorted({a["type"] for a in wb["actions"]}))),
           ("Fields documented",str(len(fields)),""),("  Parameters",str(nk("parameter")),""),
           ("  Calculated fields",str(nk("calculated")),""),("  Physical columns",str(nk("field")),"")]
     r=3
@@ -103,6 +130,9 @@ def main():
             if fill!="FFFFFF": c.fill=PatternFill("solid",fgColor=fill)
         rn+=1
     d.freeze_panes="A2"; d.auto_filter.ref=f"A1:{get_column_letter(len(cols))}{rn-1}"
+
+    # Dashboard actions
+    _actions_sheet(book, wb["actions"])
 
     # Lint / health-check findings (embedded from lint_workbook)
     add_findings_sheet(book, findings, "Lint")
