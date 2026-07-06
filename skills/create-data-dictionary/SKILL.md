@@ -91,6 +91,9 @@ A five-sheet `.xlsx` (four with `--no-graph`):
   (`Check · Field · Datasource · Detail · Formula · Suggested fix`), colour-banded per check.
 - **Dependency Graph** — the left→right picture (see below; skipped with `--no-graph`).
 
+Each colour-banded sheet (Data Dictionary, Actions, Lint) carries a small **colour key** at the top
+explaining its fills; the Dependency Graph has its own inline legend.
+
 So `build_dictionary.py` produces one consolidated workbook (dictionary **and** lint). The standalone
 `lint_workbook.py` is still there when you want a lint-only report, or a Markdown one for Obsidian.
 

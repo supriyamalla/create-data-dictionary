@@ -193,6 +193,28 @@ def write_excel(wb, calcs, findings, out):
     book.save(out)
 
 
+def legend_block(sheet, items, start_row=1, title="Colour key"):
+    """Write a compact colour key (one filled cell per item) down column A from start_row.
+
+    Returns the row where the table header should start (one blank row below the key).
+    Shared by the dictionary, actions and lint sheets so every colour-banded sheet
+    explains its own colours."""
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    arial = lambda **k: Font(name="Arial", **k)
+    thin = Side(style="thin", color="BFBFBF")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    sheet.cell(row=start_row, column=1, value=title).font = arial(bold=True, size=9, color="1F3864")
+    r = start_row + 1
+    for color, label in items:
+        c = sheet.cell(row=r, column=1, value="  " + label)
+        c.font = arial(size=9)
+        c.fill = PatternFill("solid", fgColor=color)
+        c.border = border
+        c.alignment = Alignment(vertical="center")
+        r += 1
+    return r + 1
+
+
 def add_findings_sheet(book, findings, sheet_name="Findings"):
     """Add a filterable, colour-banded findings sheet to an existing openpyxl book.
 
@@ -209,26 +231,32 @@ def add_findings_sheet(book, findings, sheet_name="Findings"):
     cols = ["Check", "Field", "Datasource", "Detail", "Formula", "Suggested fix"]
     for i, w in enumerate([22, 26, 24, 18, 50, 62], 1):
         d.column_dimensions[get_column_letter(i)].width = w
-        c = d.cell(row=1, column=i, value=cols[i - 1])
+    # colour key: the checks, grouped by the row colour they share
+    from collections import OrderedDict
+    bycolor = OrderedDict()
+    for label, key, _why, fill in CHECKS:
+        bycolor.setdefault(fill, []).append(label)
+    hdr = legend_block(d, [(fill, " / ".join(labs)) for fill, labs in bycolor.items()])
+    for i in range(1, 7):
+        c = d.cell(row=hdr, column=i, value=cols[i - 1])
         c.font = arial(bold=True, color="FFFFFF", size=10)
         c.fill = PatternFill("solid", fgColor=HEAD)
         c.alignment = Alignment(vertical="center", wrap_text=True)
-    d.row_dimensions[1].height = 22
-    rn = 2
+    d.row_dimensions[hdr].height = 22
+    rn = hdr + 1
     for label, key, _why, fill in CHECKS:
         for row in finding_rows(key, findings[key]):
-            d.append([label, row["field"], row["datasource"], row["detail"],
-                      row["formula"], row["fix"]])
+            vals = [label, row["field"], row["datasource"], row["detail"], row["formula"], row["fix"]]
             for ci in range(1, 7):
-                c = d.cell(row=rn, column=ci)
+                c = d.cell(row=rn, column=ci, value=vals[ci - 1])
                 mono = (ci == 5)
                 c.font = Font(name="Consolas" if mono else "Arial", size=9 if mono else 9.5)
                 c.alignment = Alignment(vertical="top", wrap_text=True)
                 c.border = border; c.fill = PatternFill("solid", fgColor=fill)
             rn += 1
-    if rn == 2:
-        d.append(["— no findings —"])
-    d.freeze_panes = "A2"; d.auto_filter.ref = f"A1:F{max(rn - 1, 1)}"
+    if rn == hdr + 1:
+        d.cell(row=rn, column=1, value="— no findings —"); rn += 1
+    d.freeze_panes = f"A{hdr + 1}"; d.auto_filter.ref = f"A{hdr}:F{max(rn - 1, hdr)}"
     return d
 
 
