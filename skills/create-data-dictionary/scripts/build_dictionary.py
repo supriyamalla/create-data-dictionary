@@ -15,6 +15,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from tableau_xml import parse_workbook
 from lint_workbook import lint, add_findings_sheet, CHECKS, legend_block
+from dependency_graph import PALETTE   # shared field-kind colour palette (no matplotlib import)
 
 def status(f):
     if f["kind"] == "parameter": return "Parameter"
@@ -64,8 +65,8 @@ def main():
 
     fields = sorted(wb["fields"], key=lambda f: ({"parameter":0,"calculated":1,"field":2}[f["kind"]],
                                                  f["datasource"], f["caption"].lower()))
-    NAVY="1F3864"; HEAD="2F5496"; WARN="FCE4D6"
-    KIND_FILL={"parameter":"E2EFDA","calculated":"DDEBF7","field":"FFFFFF"}
+    NAVY="1F3864"; HEAD="2F5496"; WARN=PALETTE["unused"][0]
+    KIND_FILL={k:PALETTE[k][0] for k in ("parameter","calculated","field")}
     arial=lambda **k: Font(name="Arial", **k)
     book=Workbook()
 
@@ -110,8 +111,8 @@ def main():
     widths=[26,20,12,11,11,46,52,26,26,34,16]
     for i,w in enumerate(widths,1):
         d.column_dimensions[get_column_letter(i)].width=w
-    hdr=legend_block(d, [("DDEBF7","Calculated field"),("E2EFDA","Parameter"),
-                         ("FFFFFF","Physical column"),(WARN,"Unused calc (also flagged in Status)")])
+    hdr=legend_block(d, [(KIND_FILL["calculated"],"Calculated field"),(KIND_FILL["parameter"],"Parameter"),
+                         (KIND_FILL["field"],"Physical column"),(WARN,"Unused calc (also flagged in Status)")])
     for i in range(1,len(cols)+1):
         c=d.cell(row=hdr,column=i,value=cols[i-1]); c.font=arial(bold=True,color="FFFFFF",size=10)
         c.fill=PatternFill("solid",fgColor=HEAD); c.alignment=Alignment(vertical="center",wrap_text=True)
