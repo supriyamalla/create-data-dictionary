@@ -13,11 +13,22 @@ parse_workbook.py fields.json for iterating on the visual:
 import textwrap
 from collections import defaultdict
 
-# palette: (fill, edge) by node kind / status
-COL_PARAM  = ("#FFF3C4", "#C99700")   # parameters
-COL_SOURCE = ("#D6E4FF", "#3A66B0")   # raw datasource columns
-COL_CALC   = ("#CDEBE3", "#2E8B7F")   # calculated, in use
-COL_UNUSED = ("#FBD5D5", "#C0392B")   # calculated, unused (dead logic)
+# Shared palette — one source of truth for BOTH the dictionary sheets and this graph,
+# so a concept has the same colour everywhere. (fill, outline) as bare 6-hex; the graph
+# prepends "#" for matplotlib, the Excel sheets use the fill as-is. build_dictionary.py
+# imports PALETTE from here to colour the Data Dictionary rows and its colour key.
+PALETTE = {
+    "field":      ("EDEFF2", "8A94A6"),   # physical / source column
+    "parameter":  ("E2EFDA", "6FA03C"),   # parameters
+    "calculated": ("DDEBF7", "4A78B5"),   # calculated, in use
+    "unused":     ("FCE4D6", "C0663B"),   # calculated, unused (dead logic)
+}
+
+
+def _hx(key):
+    """PALETTE entry as matplotlib-ready ('#fill', '#edge')."""
+    fill, edge = PALETTE[key]
+    return "#" + fill, "#" + edge
 
 # above this many connected nodes the graph gets dense; we still draw it but warn.
 DENSE_NODE_WARNING = 60
@@ -76,10 +87,10 @@ def _layer(nodes, edges):
 
 def _style(f):
     if f["kind"] == "parameter":
-        return COL_PARAM
+        return _hx("parameter")
     if f["kind"] == "field":
-        return COL_SOURCE
-    return COL_UNUSED if f.get("unused") else COL_CALC
+        return _hx("field")
+    return _hx("unused") if f.get("unused") else _hx("calculated")
 
 
 def render_graph(fields, png_path):
@@ -126,10 +137,10 @@ def render_graph(fields, png_path):
         ax.text(x, y, "\n".join(textwrap.wrap(n, 24)) or n,
                 ha="center", va="center", fontsize=8.2, color="#1A1A1A", zorder=3)
 
-    handles = [Patch(fc=COL_SOURCE[0], ec=COL_SOURCE[1], label="Source column"),
-               Patch(fc=COL_PARAM[0],  ec=COL_PARAM[1],  label="Parameter"),
-               Patch(fc=COL_CALC[0],   ec=COL_CALC[1],   label="Calculated (in use)"),
-               Patch(fc=COL_UNUSED[0], ec=COL_UNUSED[1], label="Calculated (unused)")]
+    handles = [Patch(fc=_hx("field")[0],      ec=_hx("field")[1],      label="Source column"),
+               Patch(fc=_hx("parameter")[0],  ec=_hx("parameter")[1],  label="Parameter"),
+               Patch(fc=_hx("calculated")[0], ec=_hx("calculated")[1], label="Calculated (in use)"),
+               Patch(fc=_hx("unused")[0],     ec=_hx("unused")[1],     label="Calculated (unused)")]
     ax.legend(handles=handles, loc="lower center", ncol=4, frameon=False,
               fontsize=9, bbox_to_anchor=(0.5, -0.04))
     ax.set_title("Calculated-field dependency graph  (data flows left → right)",
