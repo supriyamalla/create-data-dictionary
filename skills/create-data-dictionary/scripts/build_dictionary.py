@@ -14,6 +14,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from tableau_xml import parse_workbook
+from lint_workbook import lint, add_findings_sheet, CHECKS
 
 def status(f):
     if f["kind"] == "parameter": return "Parameter"
@@ -25,8 +26,11 @@ def main():
     ap.add_argument("workbook")
     ap.add_argument("-o", "--output")
     ap.add_argument("-d", "--descriptions")
+    ap.add_argument("--no-graph", action="store_true",
+                    help="skip the Dependency Graph sheet (which is added by default)")
     a = ap.parse_args()
     wb = parse_workbook(a.workbook)
+    _, findings = lint(wb)
     desc = json.load(open(a.descriptions)) if a.descriptions else {}
     out = a.output or os.path.splitext(os.path.basename(a.workbook))[0] + "_Data_Dictionary.xlsx"
 
@@ -60,7 +64,14 @@ def main():
     for f in unused:
         s[f"A{r}"]=f"   • {f['caption']}  ({f['datasource']})"; s[f"A{r}"].font=arial(size=10); r+=1
     if not unused:
-        s[f"A{r}"]="   • none"; s[f"A{r}"].font=arial(size=10,italic=True)
+        s[f"A{r}"]="   • none"; s[f"A{r}"].font=arial(size=10,italic=True); r+=1
+    r+=1
+    s[f"A{r}"]="Health check (lint):"; s[f"A{r}"].font=arial(bold=True,size=10,color="2F5496"); r+=1
+    for label,key,_why,_fill in CHECKS:
+        s[f"A{r}"]=f"   {label}"; s[f"B{r}"]=len(findings[key])
+        s[f"A{r}"].font=arial(size=10); s[f"B{r}"].font=arial(size=10,bold=True); r+=1
+    s[f"A{r}"]="   → see the Lint sheet for details & suggested fixes"
+    s[f"A{r}"].font=arial(size=9,italic=True,color="555555")
     s.column_dimensions["A"].width=32; s.column_dimensions["B"].width=10; s.column_dimensions["C"].width=70
 
     # Dictionary
@@ -92,6 +103,23 @@ def main():
             if fill!="FFFFFF": c.fill=PatternFill("solid",fgColor=fill)
         rn+=1
     d.freeze_panes="A2"; d.auto_filter.ref=f"A1:{get_column_letter(len(cols))}{rn-1}"
+
+    # Lint / health-check findings (embedded from lint_workbook)
+    add_findings_sheet(book, findings, "Lint")
+
+    if not a.no_graph:
+        try:
+            from dependency_graph import render_graph, add_graph_sheet
+            png = os.path.splitext(out)[0] + "_graph.png"
+            n_nodes, n_edges = render_graph(fields, png)
+            if n_edges:
+                add_graph_sheet(book, png)
+                print(f"Dependency graph: {n_nodes} nodes, {n_edges} edges (sheet added; image: {png})")
+            else:
+                print("Dependency graph skipped: no calculated-field dependencies to draw.")
+        except ImportError:
+            print("Dependency graph skipped: matplotlib not installed (pip install matplotlib).")
+
     book.save(out)
     print(f"Data dictionary written: {out}  ({len(fields)} fields)")
 

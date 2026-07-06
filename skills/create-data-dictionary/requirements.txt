@@ -1,1 +1,2 @@
 openpyxl>=3.1
+matplotlib>=3.6   # only needed for the optional --graph dependency-graph sheet

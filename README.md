@@ -1,6 +1,6 @@
 # create-data-dictionary — a Claude Skill for Tableau
 
-Turn any Tableau workbook into a plain-English **data dictionary** — without opening Tableau.
+Turn any Tableau workbook into a plain-English **data dictionary** — and a **lint / health-check** report — without opening Tableau.
 
 A `.twbx` is just a zip containing a `.twb` XML file. This Skill parses that XML and documents
 every datasource, calculated field (with internal IDs like `[Calculation_8273…]` resolved back
@@ -8,11 +8,18 @@ to readable names), parameter, dependency, and per-sheet usage — then writes i
 filterable Excel file with unused calculated fields flagged.
 
 ## What you get
-A two-sheet `.xlsx`:
-- **Summary** — datasource / worksheet / dashboard / field counts, plus a list of unused calculated fields.
+A filterable `.xlsx` that both **documents** and **audits** the workbook (up to four sheets):
+- **Summary** — datasource / worksheet / dashboard / field counts, unused calculated fields, and a
+  *Health check (lint)* count section.
 - **Data Dictionary** — one filterable row per field: name, datasource, kind, role, data type, a
   plain-English description, the resolved formula, what it depends on, what it feeds, the sheets it's
   used in, and a status flag.
+- **Lint** — a health-check: dead calculated fields, calcs missing a description, high-complexity calcs
+  (LOD / table-calc / deep branching) each with a suggested fix, auto-generated names, and captions
+  reused across datasources.
+- **Dependency Graph** — a left→right picture of how columns and parameters feed each calculated field.
+
+A standalone `lint_workbook.py` can also emit a lint-only report as Excel or Markdown.
 
 ## Install
 
@@ -43,7 +50,8 @@ workbook."* The skill is picked up automatically.
 > Note: Skills don't sync across surfaces. If you use both Claude.ai and Claude Code, install it to each separately.
 
 ## Requirements
-Python with `openpyxl` (listed in `requirements.txt`) — that's the only dependency.
+Python with `openpyxl` (listed in `requirements.txt`). `matplotlib` is optional — only needed for the
+Dependency Graph sheet; without it the other sheets still build.
 
 ## How it works (the short version)
 The scripts do the deterministic work — unzip, parse, resolve calc IDs, trace dependencies, compute
@@ -55,11 +63,13 @@ full workflow.
 ```
 skills/create-data-dictionary/
   SKILL.md              # the Skill definition Claude reads
-  requirements.txt      # openpyxl
+  requirements.txt      # openpyxl (+ matplotlib for the dependency graph)
   scripts/
     tableau_xml.py      # shared parser: .twbx -> structured field catalog
     parse_workbook.py   # dump fields + resolved formulas (for authoring descriptions)
-    build_dictionary.py # build the Excel data dictionary
+    build_dictionary.py # build the Excel dictionary (+ embedded Lint & Dependency Graph sheets)
+    lint_workbook.py    # health-check: dead / undocumented / complex / duplicate calcs
+    dependency_graph.py # render the dependency-graph sheet
 create-data-dictionary.zip  # zip for Claude.ai upload
 ```
 

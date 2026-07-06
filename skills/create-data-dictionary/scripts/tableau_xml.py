@@ -56,6 +56,8 @@ def parse_workbook(path):
             is_calc = (calc is not None and calc.get("class") == "tableau"
                        and calc.get("formula") is not None)
             is_param = col.get("param-domain-type") is not None
+            # the field's own in-workbook description (<desc><formatted-text><run>...)
+            desc_text = " ".join(r.text or "" for r in col.findall(".//desc//run")).strip()
             fields.append({
                 "datasource": dsname,
                 "name": col.get("name"),
@@ -65,6 +67,7 @@ def parse_workbook(path):
                 "kind": "parameter" if is_param else ("calculated" if is_calc else "field"),
                 "formula": readable(calc.get("formula")) if is_calc else "",
                 "param_default": col.get("value") if is_param else None,
+                "description": desc_text,
             })
 
     # dependencies (from readable formulas, matched against known captions)
