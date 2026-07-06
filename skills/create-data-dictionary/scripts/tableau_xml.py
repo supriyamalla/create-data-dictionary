@@ -24,6 +24,49 @@ def load_twb_text(path):
         return f.read(), os.path.basename(path)
 
 
+ACTION_COMMANDS = {
+    "tsc:brush": "Highlight",
+    "tsc:filter": "Filter",
+    "tsc:tsl-filter": "Filter",
+    "tsc:navigate-url": "Go to URL",
+    "tsc:navigate-sheet": "Go to sheet",
+    "tsc:set": "Change set",
+    "tsc:set-parameter": "Change parameter",
+}
+ACTION_TRIGGERS = {"on-select": "Select", "on-hover": "Hover", "menu": "Menu"}
+
+
+def parse_actions(root):
+    """Extract dashboard actions (filter / highlight / URL / parameter / set) from the workbook XML."""
+    acts = []
+    for a in root.findall(".//actions/action"):
+        cmd = a.find("command")
+        cmd_raw = cmd.get("command") if cmd is not None else ""
+        src = a.find("source")
+        act = a.find("activation")
+        target = ""
+        if cmd is not None:
+            for p in cmd.findall("param"):
+                if p.get("name") == "target":
+                    target = p.get("value") or ""
+                    break
+        if not target:
+            t = a.find("target")
+            if t is not None:
+                target = t.get("dashboard") or t.get("worksheet") or ""
+        trig = act.get("type") if act is not None else ""
+        acts.append({
+            "name": a.get("name"),
+            "caption": a.get("caption") or (a.get("name") or "").strip("[]"),
+            "type": ACTION_COMMANDS.get(cmd_raw, cmd_raw or "Action"),
+            "trigger": ACTION_TRIGGERS.get(trig, trig),
+            "source_dashboard": src.get("dashboard") if src is not None else "",
+            "source_sheet": src.get("worksheet") if src is not None else "",
+            "target": target,
+        })
+    return acts
+
+
 def parse_workbook(path):
     """Parse a workbook into a structured dict. Works on any .twbx/.twb."""
     text, twb_name = load_twb_text(path)
@@ -107,5 +150,6 @@ def parse_workbook(path):
         "datasources": [ds.get("caption") or ds.get("name") for ds in datasources],
         "worksheets": worksheets,
         "dashboards": dashboards,
+        "actions": parse_actions(root),
         "fields": fields,
     }
