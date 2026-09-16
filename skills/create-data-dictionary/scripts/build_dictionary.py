@@ -15,6 +15,8 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from tableau_xml import parse_workbook
 from lint_workbook import lint, add_findings_sheet, CHECKS, legend_block
+from style_check import (parse_styles, check_styles, add_style_sheet,
+                         summary_counts as style_counts)
 from dependency_graph import PALETTE   # shared field-kind colour palette (no matplotlib import)
 
 def status(f):
@@ -57,9 +59,14 @@ def main():
     ap.add_argument("-d", "--descriptions")
     ap.add_argument("--no-graph", action="store_true",
                     help="skip the Dependency Graph sheet (which is added by default)")
+    ap.add_argument("-g", "--style-guide",
+                    help="optional JSON of approved fonts / colours / number formats; "
+                         "without it the Style sheet infers the standard from the workbook")
     a = ap.parse_args()
     wb = parse_workbook(a.workbook)
     _, findings = lint(wb)
+    guide = json.load(open(a.style_guide, encoding="utf-8")) if a.style_guide else None
+    sfindings = check_styles(parse_styles(a.workbook), guide)
     desc = json.load(open(a.descriptions)) if a.descriptions else {}
     out = a.output or os.path.splitext(os.path.basename(a.workbook))[0] + "_Data_Dictionary.xlsx"
 
@@ -101,6 +108,14 @@ def main():
         s[f"A{r}"]=f"   {label}"; s[f"B{r}"]=len(findings[key])
         s[f"A{r}"].font=arial(size=10); s[f"B{r}"].font=arial(size=10,bold=True); r+=1
     s[f"A{r}"]="   → see the Lint sheet for details & suggested fixes"
+    s[f"A{r}"].font=arial(size=9,italic=True,color="555555"); r+=2
+    s[f"A{r}"]="Design QC (style):"; s[f"A{r}"].font=arial(bold=True,size=10,color="2F5496")
+    s[f"C{r}"]=("against " + os.path.basename(a.style_guide)) if a.style_guide                else "standard inferred from the workbook"
+    s[f"C{r}"].font=arial(size=9,italic=True,color="555555"); r+=1
+    for label,count in style_counts(sfindings):
+        s[f"A{r}"]=f"   {label}"; s[f"B{r}"]=count
+        s[f"A{r}"].font=arial(size=10); s[f"B{r}"].font=arial(size=10,bold=True); r+=1
+    s[f"A{r}"]="   → see the Style sheet for details & suggested fixes"
     s[f"A{r}"].font=arial(size=9,italic=True,color="555555")
     s.column_dimensions["A"].width=32; s.column_dimensions["B"].width=10; s.column_dimensions["C"].width=70
 
@@ -140,6 +155,9 @@ def main():
 
     # Lint / health-check findings (embedded from lint_workbook)
     add_findings_sheet(book, findings, "Lint")
+
+    # Design QC: fonts, colours, number formats (embedded from style_check)
+    add_style_sheet(book, sfindings, "Style")
 
     if not a.no_graph:
         try:

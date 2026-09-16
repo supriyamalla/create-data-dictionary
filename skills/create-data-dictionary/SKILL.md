@@ -12,6 +12,10 @@ description: >-
   lint / health-check it, find unused or risky calcs, or clean it up — even if they don't say "data
   dictionary" explicitly (e.g. "document my Tableau dashboard", "what do all these calcs mean",
   "catalog the fields", "audit this workbook", "find dead calculations", "any problems in this .twb").
+  ALSO design-QCs the workbook: inconsistent fonts and font sizes, colours outside the scheme, and
+  number formats that disagree (percent at 0 vs 1 vs 2 decimals, currency scaled differently) — use
+  it for "check my dashboard formatting", "are the fonts consistent", "do the numbers format the
+  same way", "QC this dashboard before it ships", "does this follow our style guide".
 ---
 
 # Tableau Workbook — Inspect (dictionary + lint)
@@ -78,10 +82,50 @@ Report the headline counts to the user and offer to act on the findings (e.g. wr
 descriptions — which also feed the dictionary's Description column). The lint never edits the
 workbook.
 
+## Workflow — design QC (style)
+
+The formatting review a human does by eye before a dashboard ships. One command, no setup:
+```bash
+python scripts/style_check.py WORKBOOK.twbx
+```
+It prints the findings; `build_dictionary.py` also embeds them as the **Style** sheet.
+
+Two ways to decide what counts as a violation, and they combine:
+- **Majority-wins (default).** The convention is inferred from the workbook itself — "3 of 5 places
+  use Tableau Medium, 2 use Tableau Regular". No configuration, so it runs on any workbook,
+  including a client's. Where a group is too small or genuinely split, it says *no consistent
+  standard* and lists the variants rather than crowning an arbitrary winner.
+- **Style guide (optional).** Pass approved values and it also flags a workbook that is
+  consistently off-brand:
+  ```bash
+  python scripts/style_check.py WORKBOOK.twbx -g style_guide.json
+  python scripts/build_dictionary.py WORKBOOK.twbx -g style_guide.json -o Dictionary.xlsx
+  ```
+  ```json
+  {"fonts":   {"family": ["Tableau Book"], "size": ["9", "10", "12"]},
+   "colors":  ["#1f77b4", "#2ca02c", "#d62728"],
+   "number_formats": {"currency": {"decimals": 0}, "percent": {"decimals": 1}}}
+  ```
+  Every key is optional — supply only the ones your team has actually standardised.
+
+The checks:
+- **Font family / font size** — per element role (title, header, axis, legend, quick-filter, labels,
+  worksheet body), the value most places use is the standard; deviations are listed with their sheet.
+- **Number format** — every field's format code is classified into *family + decimals + scale*, so
+  `p0%`, `p0.0%` and `n#,##0.0"%"` are compared as the same kind of thing (all percentages) even
+  though they are written differently. Flags mismatched precision and mismatched scaling ("$12K" vs
+  "$12,000").
+- **Off-palette colour** — with a style guide, any colour outside the approved scheme; without one,
+  colours used in only one or two places while the rest of the workbook shares a scheme. Greys,
+  black, white and transparent are treated as Tableau defaults, not scheme choices.
+
+Deliberately out of scope in this version: tooltip typography (high volume, low review value) and
+font weight. Number formats left at the locale default are not counted as a precision decision.
+
 ## Output
-A five-sheet `.xlsx` (four with `--no-graph`):
+A six-sheet `.xlsx` (five with `--no-graph`):
 - **Summary** — datasource/sheet/field counts, dashboard-action count, a list of unused calcs, and a
-  *Health check (lint)* section with the per-check counts.
+  *Health check (lint)* section and a *Design QC (style)* section, each with per-check counts.
 - **Data Dictionary** — one filterable row per field: name, datasource, kind, role, datatype, your
   description, the resolved formula, dependencies, what it feeds, sheets it's used in, status flag.
   Rows are colour-banded by kind; unused calcs are flagged.
@@ -89,12 +133,15 @@ A five-sheet `.xlsx` (four with `--no-graph`):
   type (filter / highlight / URL / parameter). Shows "— no dashboard actions —" if the workbook has none.
 - **Lint** — the health-check findings, embedded automatically: one filterable row per issue
   (`Check · Field · Datasource · Detail · Formula · Suggested fix`), colour-banded per check.
+- **Style** — the design-QC findings: one filterable row per issue (`Check · Where · Element ·
+  Found · Workbook standard · Suggested fix`), colour-banded per check. Shows "— no style findings —"
+  if the workbook is clean.
 - **Dependency Graph** — the left→right picture (see below; skipped with `--no-graph`).
 
-Each colour-banded sheet (Data Dictionary, Actions, Lint) carries a small **colour key** at the top
+Each colour-banded sheet (Data Dictionary, Actions, Lint, Style) carries a small **colour key** at the top
 explaining its fills; the Dependency Graph has its own inline legend.
 
-So `build_dictionary.py` produces one consolidated workbook (dictionary **and** lint). The standalone
+So `build_dictionary.py` produces one consolidated workbook (dictionary, lint **and** design QC). The standalone
 `lint_workbook.py` is still there when you want a lint-only report, or a Markdown one for Obsidian.
 
 The third **Dependency Graph** sheet shows a left→right picture of how source columns and
